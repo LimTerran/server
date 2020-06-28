@@ -781,9 +781,9 @@ public class MemoryMessagesStore implements IMessagesStore {
         List<WFCMessage.GroupMember> updatedMemberList = new ArrayList<>();
         for (WFCMessage.GroupMember member : memberList) {
             if (member.getMemberId().equals(groupInfo.getOwner())) {
-                member = member.toBuilder().setUpdateDt(dt).setType(ProtoConstants.GroupMemberType.GroupMemberType_Owner).build();
+                member = member.toBuilder().setUpdateDt(dt).setCreateDt(dt).setType(ProtoConstants.GroupMemberType.GroupMemberType_Owner).build();
             } else {
-                member = member.toBuilder().setUpdateDt(dt).build();
+                member = member.toBuilder().setUpdateDt(dt).setCreateDt(dt).build();
             }
             groupMembers.put(groupId, member);
             updatedMemberList.add(member);
@@ -805,6 +805,8 @@ public class MemoryMessagesStore implements IMessagesStore {
             return ErrorCode.ERROR_CODE_NOT_EXIST;
         }
 
+
+        int maxCount = Integer.MAX_VALUE;
 
         if (!isAdmin) {
             boolean isMember = false;
@@ -835,6 +837,15 @@ public class MemoryMessagesStore implements IMessagesStore {
             if (!isMember && !(memberList.size() == 1 && operator.equals(memberList.get(0).getMemberId()))) {
                 return ErrorCode.ERROR_CODE_NOT_IN_GROUP;
             }
+
+            SystemSettingPojo maxMemberSetting = databaseStore.getSystemSetting(ProtoConstants.SystemSettingType.Group_Max_Member_Count);
+            if (maxMemberSetting != null) {
+                try {
+                    maxCount = Integer.parseInt(maxMemberSetting.value);
+                } catch (NumberFormatException e) {
+                    e.printStackTrace();
+                }
+            }
         }
 
         long updateDt = System.currentTimeMillis();
@@ -843,9 +854,9 @@ public class MemoryMessagesStore implements IMessagesStore {
         ArrayList<String> newInviteUsers = new ArrayList<>();
         for (WFCMessage.GroupMember member : memberList) {
             if (member.getMemberId().equals(groupInfo.getOwner())) {
-                member = member.toBuilder().setType(GroupMemberType_Owner).setUpdateDt(updateDt).setAlias("").build();
+                member = member.toBuilder().setType(GroupMemberType_Owner).setUpdateDt(updateDt).setCreateDt(updateDt).setAlias("").build();
             } else {
-                member = member.toBuilder().setType(GroupMemberType_Normal).setUpdateDt(updateDt).setAlias("").build();
+                member = member.toBuilder().setType(GroupMemberType_Normal).setUpdateDt(updateDt).setCreateDt(updateDt).setAlias("").build();
             }
             tmp.add(member);
             newInviteUsers.add(member.getMemberId());
@@ -856,6 +867,18 @@ public class MemoryMessagesStore implements IMessagesStore {
         Collection<WFCMessage.GroupMember> members = groupMembers.get(groupId);
         if (members == null || members.size() == 0) {
             members = loadGroupMemberFromDB(hzInstance, groupId);
+        }
+
+        if (maxCount != Integer.MAX_VALUE) {
+            int existCount = 0;
+            for (WFCMessage.GroupMember member : members) {
+                if (member.getType() != GroupMemberType_Removed) {
+                    existCount++;
+                }
+            }
+            if (existCount + newInviteUsers.size() > maxCount) {
+                return ErrorCode.ERROR_CODE_GROUP_EXCEED_MAX_MEMBER_COUNT;
+            }
         }
 
         for (WFCMessage.GroupMember member : members) {
@@ -1063,13 +1086,21 @@ public class MemoryMessagesStore implements IMessagesStore {
             }
 
             if (oldInfo.getType() == ProtoConstants.GroupType.GroupType_Normal) {
-                if (oldInfo.getOwner() == null) {
-                    return ErrorCode.ERROR_CODE_NOT_RIGHT;
-                }
-                if (!oldInfo.getOwner().equals(operator)) {
-                    if (modifyType == Modify_Group_Extra) {
+                if (!operator.equals(oldInfo.getOwner())) {
+                    WFCMessage.GroupMember gm = getGroupMember(groupId, operator);
+                    boolean isManager = false;
+                    if (gm != null && gm.getType() == GroupMemberType_Manager) {
+                        isManager = true;
+                    }
+                    if (!isManager && modifyType != Modify_Group_Name && modifyType != Modify_Group_Portrait && modifyType != Modify_Group_Extra) {
                         return ErrorCode.ERROR_CODE_NOT_RIGHT;
                     }
+                }
+            }
+
+            if (oldInfo.getType() == ProtoConstants.GroupType.GroupType_Free) {
+                if (modifyType != Modify_Group_Name && modifyType != Modify_Group_Portrait && modifyType != Modify_Group_Extra) {
+                    return ErrorCode.ERROR_CODE_NOT_RIGHT;
                 }
             }
         }
@@ -2271,10 +2302,12 @@ public class MemoryMessagesStore implements IMessagesStore {
 
     @Override
     public ErrorCode blackUserRequest(String fromUser, String targetUserId, int state, long[] heads) {
+        if(state != 0 && state != 1 && state != 2){
+            return ErrorCode.INVALID_PARAMETER;
+        }
+
         if (state == 2) {
             state = 1;
-        } else {
-            state = 0;
         }
 
         HazelcastInstance hzInstance = m_Server.getHazelcastInstance();

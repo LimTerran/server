@@ -43,11 +43,6 @@
 
 ![野火IM](http://static.wildfirechat.cn/download_qrcode.png)
 
-#### 加入野火官方体验交流群
-使用野火IM移动客户端扫码下面二维码（不是使用微信扫码），和野火IM的爱好者一起畅谈野火IM的问题和经验：
-
-![野火IM官方交流群](http://static.wildfirechat.cn/wildfirechat_official_group.jpeg)
-
 #### 应用截图
 ![ios-demo](http://static.wildfirechat.cn/ios-demo.gif)
 
@@ -73,12 +68,7 @@
 
 ## 编译
 在安装JDK1.8以上及maven的前提下，在命令行中执行```mvn clean compile package```，生成的目标文件在```./distribution/target/distribution-xxxx-bundle-tar.tar.gz```
-
-## 捐赠者名单
-
-| 捐赠者 | 商标 | 金额 | 简介 |
-| ----- | ---- | -------- | --- |
-| [SAMOS](http://samos.io) | ![SAMOS](http://static.wildfirechat.cn/SAMOS.png) | 保密 | 一站式区块链解决方案服务商(http://samos.io) |
+> 由于使用了一个git的maven插件，如果本地没有git信息就会编译出错，请使用```git clone```的方法下载代码，或者下载压缩包解压后在根目录创建```.git```的空目录。建议用```git clone```的方式下载代码。
 
 ## 特别感谢
 1. [moquette](https://github.com/moquette-io/moquette) 本项目是基于此项目二次开发而来，处理MQTT相关业务。
